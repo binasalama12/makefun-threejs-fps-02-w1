@@ -90,11 +90,11 @@ function explodeNade(g) {
     const d = bot.pos.distanceTo(g.mesh.position);
     if (d < GRENADE_RADIUS) {
       const dmg = Math.round(GRENADE_DAMAGE * (1 - d / (GRENADE_RADIUS + 1)));
-      if (bots.damage(bot, dmg)) onKill('You', bot);
+      if (bots.damage(bot, dmg)) onKill('You', bot, { weapon: 'Barnacle Grenade' });
     }
   }
   const dp = player.state.pos.distanceTo(g.mesh.position);
-  if (player.state.alive && dp < GRENADE_RADIUS) hurtPlayer(Math.round(GRENADE_DAMAGE * 0.4 * (1 - dp / (GRENADE_RADIUS + 1))), 'Barnacle blast');
+  if (player.state.alive && dp < GRENADE_RADIUS) hurtPlayer(Math.round(GRENADE_DAMAGE * 0.4 * (1 - dp / (GRENADE_RADIUS + 1))), 'Barnacle blast', { fromPos: g.mesh.position, weapon: 'Barnacle Grenade' });
   scene.remove(g.mesh);
 }
 
@@ -153,23 +153,35 @@ function tryBuy(index) {
 }
 
 // ---- combat -------------------------------------------------------------------
-function hurtPlayer(dmg, sourceName) {
+// Bots all carry the yard-standard carbine; the feed names it so a bot kill
+// reads the same as a player kill.
+const BOT_WEAPON = 'Carbine Tern-4';
+function hurtPlayer(dmg, sourceName, opts) {
   if (!player.state.alive || dmg <= 0) return;
   player.state.hp -= dmg;
   hud.setHp(player.state.hp);
   hud.damageFlash(); audio.hurt();
+  // Damage-direction arc: bearing of the source relative to the player's view.
+  if (opts && opts.fromPos) {
+    const dx = opts.fromPos.x - player.state.pos.x;
+    const dz = opts.fromPos.z - player.state.pos.z;
+    const sin = Math.sin(player.state.yaw), cos = Math.cos(player.state.yaw);
+    const fwd = dx * -sin + dz * -cos;
+    const rgt = dx * cos + dz * -sin;
+    hud.damageDir(Math.atan2(rgt, fwd) * 180 / Math.PI);
+  }
   if (player.state.hp <= 0) {
     player.state.alive = false;
     stat('You').d += 1;
-    hud.feed(`${sourceName} eliminated You`);
+    hud.feed({ killer: sourceName, victim: 'You', weapon: opts && opts.weapon, headshot: !!(opts && opts.headshot) });
     hud.banner('You are down', 'Your crew fights on — the round still counts.', 2400);
   }
 }
-function onKill(killerName, bot) {
+function onKill(killerName, bot, opts) {
   stat(bot.name).d += 1;
   if (killerName === 'You') { stat('You').k += 1; S.money += 300; hud.setMoney(S.money); }
   else stat(killerName).k += 1;
-  hud.feed(`${killerName} eliminated ${bot.name}`);
+  hud.feed({ killer: killerName, victim: bot.name, weapon: opts && opts.weapon, headshot: !!(opts && opts.headshot) });
 }
 function onBotShot(bot, target, hit, dmg, head) {
   tmpA.set(bot.pos.x, 1.35, bot.pos.z);
@@ -178,8 +190,8 @@ function onBotShot(bot, target, hit, dmg, head) {
   tracer(tmpA, tmpB, bot.team === 'ally' ? PALETTE.ally : PALETTE.foe);
   if (bot.team === 'foe') audio.foeShot();
   if (!hit) return;
-  if (target.isPlayer) hurtPlayer(dmg, bot.name);
-  else if (bots.damage(target.bot, dmg)) onKill(bot.name, target.bot);
+  if (target.isPlayer) hurtPlayer(dmg, bot.name, { fromPos: bot.pos, weapon: BOT_WEAPON, headshot: head });
+  else if (bots.damage(target.bot, dmg)) onKill(bot.name, target.bot, { weapon: BOT_WEAPON, headshot: head });
 }
 
 const shootDir = new THREE.Vector3();
@@ -191,7 +203,7 @@ function playerShoot() {
   player.recoil(def.kick + playRng.next() * def.kick * 0.5, (playRng.next() * 2 - 1) * def.kick * 0.4);
   const spread = spreadFor(def, player.speed(), player.state.crouching, player.state.airTime);
   const shootables = world.shootables.concat(bots.hitMeshes);
-  let anyHit = false, anyKill = false;
+  let anyHit = false, anyKill = false, anyHead = false;
   for (let p = 0; p < def.pellets; p++) {
     camera.getWorldDirection(shootDir);
     shootDir.x += (playRng.next() * 2 - 1) * spread;
@@ -211,13 +223,13 @@ function playerShoot() {
         const fall = hit.distance > def.range * 0.6 ? 0.7 : 1;
         const dmg = Math.round(def.damage * (isHead ? def.headMult : 1) * fall);
         const killed = bots.damage(bot, dmg);
-        anyHit = true; anyKill = anyKill || killed;
+        anyHit = true; anyKill = anyKill || killed; anyHead = anyHead || isHead;
         audio.hit(isHead);
-        if (killed) onKill('You', bot);
+        if (killed) onKill('You', bot, { weapon: def.name, headshot: isHead });
       }
     }
   }
-  if (anyHit) hud.hitmarker(anyKill);
+  if (anyHit) hud.hitmarker(anyKill, anyHead);
   syncAmmoHud();
 }
 function syncAmmoHud() {
@@ -462,7 +474,7 @@ function stageShot(mode) {
     loadout.state.flashLeft = 0.5;
     view.flash.visible = true; view.light.intensity = 14;
     hud.setMoney(S.money); hud.setHp(72); syncAmmoHud();
-    hud.feed("Sari 'Lantern' eliminated Danu 'Lowtide'");
+    hud.feed({ killer: "Sari 'Lantern'", victim: "Danu 'Lowtide'", weapon: 'Carbine Tern-4', headshot: true });
     hud.banner('', '', 1);
     hud.setClock(47, 'live', 4, 2, 1);
   } else {

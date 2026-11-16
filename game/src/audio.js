@@ -42,7 +42,12 @@ export function createAudio() {
     },
     foeShot() { tone(160, 0.06, 'square', 0.045, 60); },
     reload() { tone(320, 0.05, 'square', 0.06); setTimeout(() => tone(240, 0.05, 'square', 0.06), 120); },
-    hit(head) { tone(head ? 880 : 520, 0.06, 'sine', 0.1); },
+    hit(head) {
+      // Headshots get an unmistakable double-ping an octave above the body tick,
+      // so a cranial hit reads by ear alone in the middle of a burst.
+      if (head) { tone(1318, 0.05, 'sine', 0.13); setTimeout(() => tone(1760, 0.08, 'sine', 0.13), 45); }
+      else tone(520, 0.06, 'sine', 0.1);
+    },
     hurt() { tone(110, 0.12, 'sawtooth', 0.1, 60); },
     buy() { tone(660, 0.07, 'sine', 0.09); setTimeout(() => tone(990, 0.09, 'sine', 0.09), 70); },
     denied() { tone(140, 0.12, 'square', 0.08); },

@@ -40,8 +40,16 @@
   #hitm i{position:absolute;background:var(--dusk)}
   #hitm i:nth-child(1){left:11px;top:0;width:2px;height:7px}#hitm i:nth-child(2){left:11px;bottom:0;width:2px;height:7px}
   #hitm i:nth-child(3){top:11px;left:0;height:2px;width:7px}#hitm i:nth-child(4){top:11px;right:0;height:2px;width:7px}
+  #hitm.kill i{background:var(--charge)}
+  #hitm.head i{background:#ff4747}
+  #dmgDir{position:fixed;left:50%;top:50%;width:132px;height:132px;transform:translate(-50%,-50%);opacity:0;transition:opacity .25s;pointer-events:none}
+  #dmgDir i{position:absolute;inset:0;border-radius:50%;border:4px solid transparent;border-top-color:#ff4747}
   #feed{position:fixed;right:20px;top:70px;text-align:right;font-size:13px;font-family:var(--mono);display:grid;gap:4px}
-  #feed div{background:var(--panel);padding:3px 9px;border-radius:4px}
+  #feed div{background:var(--panel);padding:3px 9px;border-radius:4px;transition:opacity .6s}
+  #feed .kf-k{color:#37c8b4}
+  #feed .kf-v{color:#ff7847}
+  #feed .kf-w{opacity:.65;font-size:11px}
+  #feed .kf-h{color:#ff4747;font-weight:700;letter-spacing:.04em}
   #banner{position:fixed;top:19%;left:50%;transform:translateX(-50%);text-align:center}
   #banner h2{margin:0;font-size:34px;letter-spacing:.04em;text-shadow:0 2px 10px #000}
   #banner p{margin:4px 0 0;font-size:15px;opacity:.92;text-shadow:0 1px 6px #000}
@@ -75,6 +83,7 @@
   <div id="br"><div id="wname">P9 Kestrel</div><div id="ammo">12 / 48</div><div id="nade">Barnacle grenades: 0 · [G]</div></div>
   <div id="cross"><i></i><i></i><i></i><i></i></div>
   <div id="hitm"><i></i><i></i><i></i><i></i></div>
+  <div id="dmgDir"><i></i></div>
   <div id="feed"></div>
   <div id="banner"><h2 id="bannerTitle"></h2><p id="bannerSub"></p></div>
   <div id="prog" hidden><span id="progLabel">Planting charge…</span><div id="progWrap"><div id="progBar"></div></div></div>

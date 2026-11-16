@@ -8,11 +8,11 @@ export function createHud() {
     roundState = el('roundState'), scoreA = el('scoreA'), scoreF = el('scoreF'),
     bannerTitle = el('bannerTitle'), bannerSub = el('bannerSub'), feed = el('feed'),
     prog = el('prog'), progBar = el('progBar'), progLabel = el('progLabel'),
-    vig = el('vig'), hitm = el('hitm'), cross = el('cross'),
+    vig = el('vig'), hitm = el('hitm'), cross = el('cross'), dmgDir = el('dmgDir'),
     buyWrap = el('buyWrap'), buyRows = el('buyRows'), buyMoney = el('buyMoney'),
     boardWrap = el('boardWrap'), boardTitle = el('boardTitle'), boardSub = el('boardSub'), boardBody = el('boardBody'),
     startWrap = el('startWrap');
-  let hitTimer = 0, bannerTimer = 0;
+  let hitTimer = 0, bannerTimer = 0, dmgTimer = 0;
   const cache = {};
   function set(key, node, value) { if (cache[key] !== value) { cache[key] = value; node.textContent = value; } }
   return {
@@ -42,18 +42,43 @@ export function createHud() {
       clearTimeout(bannerTimer);
       bannerTimer = setTimeout(() => { bannerTitle.textContent = ''; bannerSub.textContent = ''; }, holdMs || 2600);
     },
-    feed(text) {
+    // Kill feed: structured events render as killer [weapon] victim with a
+    // headshot badge; plain strings still work for one-off notices. Entries
+    // fade, then remove themselves so the corner never fills with history.
+    feed(event) {
       const row = document.createElement('div');
-      row.textContent = text;
+      if (typeof event === 'string') {
+        row.textContent = event;
+      } else {
+        const k = document.createElement('span'); k.className = 'kf-k'; k.textContent = event.killer;
+        const w = document.createElement('span'); w.className = 'kf-w'; w.textContent = ` [${event.weapon || 'carbine'}] `;
+        const v = document.createElement('span'); v.className = 'kf-v'; v.textContent = event.victim;
+        row.append(k, w, v);
+        if (event.headshot) {
+          const h = document.createElement('span'); h.className = 'kf-h'; h.textContent = ' ⌖ HEADSHOT';
+          row.append(h);
+        }
+      }
       feed.prepend(row);
       while (feed.children.length > 5) feed.lastChild.remove();
       setTimeout(() => { row.style.opacity = '0.35'; }, 4200);
+      setTimeout(() => { row.remove(); }, 6500);
     },
-    hitmarker(kill) {
+    hitmarker(kill, head) {
       hitm.classList.add('on');
+      hitm.classList.toggle('head', !!head);
+      hitm.classList.toggle('kill', !!kill);
       hitm.style.transform = kill ? 'translate(-50%,-50%) rotate(45deg) scale(1.3)' : 'translate(-50%,-50%) rotate(45deg)';
       clearTimeout(hitTimer);
-      hitTimer = setTimeout(() => hitm.classList.remove('on'), kill ? 320 : 110);
+      hitTimer = setTimeout(() => hitm.classList.remove('on', 'head', 'kill'), kill ? 320 : 110);
+    },
+    // Red arc at the screen centre rotated to the bearing the damage came from
+    // (0deg = ahead, positive = clockwise toward the player's right).
+    damageDir(deg) {
+      dmgDir.style.transform = `translate(-50%,-50%) rotate(${deg}deg)`;
+      dmgDir.style.opacity = '1';
+      clearTimeout(dmgTimer);
+      dmgTimer = setTimeout(() => { dmgDir.style.opacity = '0'; }, 750);
     },
     damageFlash() { vig.style.opacity = '1'; setTimeout(() => { vig.style.opacity = '0'; }, 130); },
     progress(label, frac) {
