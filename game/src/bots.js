@@ -60,7 +60,11 @@ export function createBots(scene, rng) {
     ctx.raycaster.set(losOrigin, losDir);
     ctx.raycaster.far = dist - 0.7;
     const hit = ctx.raycaster.intersectObjects(ctx.worldShootables, false)[0];
-    return !hit;
+    if (hit) return false;
+    // A live smoke cloud blocks vision just like a container does: if the
+    // sight segment passes through one, the bot sees nothing beyond it.
+    if (ctx.smokeBlocks && ctx.smokeBlocks(losOrigin, targetPos)) return false;
+    return true;
   }
 
   function moveToward(bot, dest, dt, speedScale) {

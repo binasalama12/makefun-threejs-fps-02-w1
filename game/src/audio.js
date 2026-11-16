@@ -56,5 +56,6 @@ export function createAudio() {
     boom() { noise(0.9, 0.5, 320); tone(60, 0.8, 'sine', 0.3, 28); },
     roundEnd(win) { tone(win ? 523 : 330, 0.14, 'sine', 0.09); setTimeout(() => tone(win ? 784 : 262, 0.2, 'sine', 0.09), 140); },
     throwWhoosh() { noise(0.16, 0.07, 2400); },
+    smokeHiss() { noise(1.15, 0.11, 3400); },
   };
 }

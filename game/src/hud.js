@@ -22,11 +22,11 @@ export function createHud() {
       hpBar.style.background = hp > 35 ? 'var(--teal)' : '#ff7847';
     },
     setMoney(v) { set('m', money, `$${v}`); set('bm', buyMoney, `$${v}`); },
-    setAmmo(mag, reserve, name, grenades) {
+    setAmmo(mag, reserve, name, grenades, smokes) {
       set('a', ammo, `${mag} / ${reserve}`);
       ammo.classList.toggle('low', mag <= Math.ceil(5));
       set('w', wname, name);
-      set('n', nade, `Barnacle grenades: ${grenades} · [G]`);
+      set('n', nade, `Barnacle: ${grenades} · [G] · Smoke: ${smokes || 0} · [H]`);
     },
     setClock(seconds, phase, round, a, f) {
       const s = Math.max(0, Math.ceil(seconds));

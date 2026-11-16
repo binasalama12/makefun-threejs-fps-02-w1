@@ -9,10 +9,11 @@ import { makeRng } from './rng.js';
 import { PALETTE } from './palette.js';
 import { createAudio } from './audio.js';
 import { createWorld, SITES, ATTACK_SPAWN, DEFEND_SPAWNS, ALLY_SPAWNS } from './world.js';
-import { WEAPONS, BUY_ORDER, GRENADE_PRICE, GRENADE_DAMAGE, GRENADE_RADIUS, spreadFor, buildViewModel, createLoadout } from './weapons.js';
+import { WEAPONS, BUY_ORDER, GRENADE_PRICE, GRENADE_DAMAGE, GRENADE_RADIUS, SMOKE_PRICE, spreadFor, buildViewModel, createLoadout } from './weapons.js';
 import { createPlayer } from './player.js';
 import { createBots } from './bots.js';
 import { createHud } from './hud.js';
+import { createSmoke } from './smoke.js';
 
 const STEP = 1 / 60;
 const BUY_TIME = 9;
@@ -47,6 +48,7 @@ const loadout = createLoadout();
 const view = buildViewModel(camera);
 const bots = createBots(scene, playRng);
 bots.spawnAll(ALLY_SPAWNS, DEFEND_SPAWNS);
+const smoke = createSmoke(scene);
 const raycaster = new THREE.Raycaster();
 
 // ---- tracers: a small reused pool of glowing lines -------------------------
@@ -81,6 +83,17 @@ function throwGrenade() {
   camera.getWorldDirection(dir);
   grenades.push({ mesh, vel: dir.multiplyScalar(13).add(new THREE.Vector3(0, 3.4, 0)), fuse: 1.6 });
   audio.throwWhoosh();
+  syncAmmoHud();
+}
+const smokeDir = new THREE.Vector3();
+function throwSmoke() {
+  if (loadout.state.smokes <= 0 || !player.state.alive) return;
+  loadout.state.smokes -= 1;
+  camera.getWorldDirection(smokeDir);
+  smoke.throwFrom(camera.position, smokeDir);
+  audio.throwWhoosh();
+  audio.smokeHiss();
+  syncAmmoHud();
 }
 function explodeNade(g) {
   audio.boom();
@@ -133,6 +146,7 @@ function buyItems() {
     return { id, name: w.name, desc: `DMG ${w.damage}${w.pellets > 1 ? ' x' + w.pellets : ''} · MAG ${w.mag}${w.auto ? ' · AUTO' : ''}`, price: w.price, owned: !!loadout.state.owned[id] };
   });
   items.push({ id: 'grenade', name: 'Barnacle Grenade', desc: `DMG ${GRENADE_DAMAGE} · blast ${GRENADE_RADIUS}m · throw with G`, price: GRENADE_PRICE, owned: loadout.state.grenades > 0 });
+  items.push({ id: 'smoke', name: 'Harbour Smoke', desc: 'Vision-blocking cloud · breaks bot sightlines · throw with H', price: SMOKE_PRICE, owned: loadout.state.smokes > 0 });
   return items;
 }
 function tryBuy(index) {
@@ -142,6 +156,9 @@ function tryBuy(index) {
   if (it.id === 'grenade') {
     if (S.money < GRENADE_PRICE) { audio.denied(); return; }
     S.money -= GRENADE_PRICE; loadout.state.grenades += 1; audio.buy();
+  } else if (it.id === 'smoke') {
+    if (S.money < SMOKE_PRICE) { audio.denied(); return; }
+    S.money -= SMOKE_PRICE; loadout.state.smokes += 1; audio.buy();
   } else {
     if (loadout.state.owned[it.id]) { loadout.equip(it.id); audio.buy(); }
     else if (S.money >= it.price) { S.money -= it.price; loadout.buy(it.id); audio.buy(); }
@@ -234,7 +251,7 @@ function playerShoot() {
 }
 function syncAmmoHud() {
   const d = loadout.def();
-  hud.setAmmo(loadout.state.mag, loadout.state.reserve, d.name, loadout.state.grenades);
+  hud.setAmmo(loadout.state.mag, loadout.state.reserve, d.name, loadout.state.grenades, loadout.state.smokes);
 }
 
 // ---- round flow -----------------------------------------------------------------
@@ -253,6 +270,7 @@ function assignGoals() {
 }
 function startRound() {
   loadout.resetRound(playerAliveLastRound);
+  smoke.clear();
   bots.resetAll(ALLY_SPAWNS, DEFEND_SPAWNS);
   player.reset(ATTACK_SPAWN);
   S.planted = false; S.plantSite = null; S.plantProgress = 0; S.defuseProgress = 0;
@@ -295,6 +313,7 @@ function step(dt) {
     g.fuse -= dt;
     if (g.fuse <= 0) { explodeNade(g); grenades.splice(i, 1); }
   }
+  smoke.update(dt);
   loadout.step(dt);
   view.group.position.z = -0.45 + loadout.state.kick;
   view.group.rotation.x = loadout.state.kick * 2;
@@ -317,7 +336,7 @@ function step(dt) {
     playerDesc.alive = player.state.alive;
     playerDesc.speed = player.speed();
     for (const d of botDescs) { d.alive = d.bot.alive; d.speed = d.bot.mode === 'engage' ? 1.3 : 2.6; }
-    bots.step(dt, { colliders: world.colliders, worldShootables: world.shootables, raycaster, rng: playRng, targetsOf, onBotShot });
+    bots.step(dt, { colliders: world.colliders, worldShootables: world.shootables, raycaster, rng: playRng, targetsOf, onBotShot, smokeBlocks: (a, b) => smoke.isBlocked(a, b) });
     // Planting by the player.
     if (!S.planted && player.state.alive) {
       const nearSite = [SITES.A, SITES.B].find((s) => player.state.pos.distanceTo(s.pos) <= s.radius);
@@ -418,12 +437,13 @@ window.addEventListener('keydown', (e) => {
   keys.add(e.code);
   if (e.code === 'Space' || e.code === 'Tab') e.preventDefault();
   if (shotMode) return;
-  if (S.phase === 'buy' && ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5'].includes(e.code)) tryBuy(Number(e.code.slice(-1)) - 1);
+  if (S.phase === 'buy' && ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit6'].includes(e.code)) tryBuy(Number(e.code.slice(-1)) - 1);
   else if (S.phase === 'live') {
     if (e.code === 'Digit1') { loadout.equip('kestrel'); syncAmmoHud(); }
     if (e.code === 'Digit2') { const prim = BUY_ORDER.find((id) => loadout.state.owned[id]); if (prim) { loadout.equip(prim); syncAmmoHud(); } }
     if (e.code === 'KeyR' && loadout.reload()) audio.reload();
     if (e.code === 'KeyG') throwGrenade();
+    if (e.code === 'KeyH') throwSmoke();
   }
   if (e.code === 'Tab') hud.showBoard(`Round ${S.round} — ${S.winsA} : ${S.winsF}`, S.overInfo || 'Harbour Watch attack the plant sites.', boardRows());
 });
@@ -470,6 +490,8 @@ function stageShot(mode) {
     player.state.yaw = Math.atan2(-dx, -dz); player.state.pitch = -0.03;
     syncCamera();
     loadout.state.mag = 19;
+    smoke.deploy(new THREE.Vector3(2.5, 0, -1));
+    smoke.update(1.2); // bloom the staged cloud — shot mode never runs the loop
     playerShoot(); playerShoot();
     loadout.state.flashLeft = 0.5;
     view.flash.visible = true; view.light.intensity = 14;

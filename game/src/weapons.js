@@ -15,6 +15,7 @@ export const BUY_ORDER = ['sprayling', 'brine', 'tern', 'gull'];
 export const GRENADE_PRICE = 300;
 export const GRENADE_DAMAGE = 95;
 export const GRENADE_RADIUS = 5.2;
+export const SMOKE_PRICE = 200;
 
 export function spreadFor(def, speed, crouching, airTime) {
   const moveT = Math.min(1, speed / 5.4);
@@ -62,6 +63,7 @@ export function createLoadout() {
   const state = {
     owned,
     grenades: 0,
+    smokes: 0,
     mag: WEAPONS.kestrel.mag,
     reserve: WEAPONS.kestrel.reserve,
     cooldown: 0,
@@ -103,7 +105,7 @@ export function createLoadout() {
     },
     step,
     resetRound(keepGear) {
-      if (!keepGear) { for (const k of Object.keys(owned)) if (k !== 'kestrel') delete owned[k]; current = 'kestrel'; state.grenades = 0; }
+      if (!keepGear) { for (const k of Object.keys(owned)) if (k !== 'kestrel') delete owned[k]; current = 'kestrel'; state.grenades = 0; state.smokes = 0; }
       if (!owned[current]) current = 'kestrel';
       state.mag = def().mag; state.reserve = def().reserve;
       state.cooldown = 0; state.reloadLeft = 0; state.flashLeft = 0; state.kick = 0;
